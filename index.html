@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>절대음감 퀴즈 v3.5.1 (PWA/iOS/오류패치)</title>
+<title>절대음감 퀴즈 v3.7</title>
 
 <!-- PWA 연결 -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#111111">
 
-<!-- iOS 독립 실행(사파리 UI 제거) -->
+<!-- iOS 독립 실행 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -23,9 +23,16 @@
 
 <style>
   :root{
+    /* 색상 */
     --bg:#f9fafb; --card:#ffffff; --fg:#0f172a; --muted:#64748b;
     --border:#e5e7eb; --accent:#3b82f6; --accent-weak:#dbeafe;
     --ok:#10b981; --err:#ef4444;
+
+    /* 키 크기(가변) */
+    --key-pad: 12px;   /* 안쪽 여백 */
+    --key-note: 16px;  /* 음명 폰트 */
+    --key-sub: 12px;   /* 계명 폰트 */
+    --key-min: 110px;  /* 최소 폭 */
   }
   @media (prefers-color-scheme: dark){
     :root{ --bg:#0b1020; --card:#12182a; --fg:#e5e7eb; --muted:#93a2bf; --border:#1f2740; --accent:#60a5fa; --accent-weak:#0b2a57; }
@@ -33,56 +40,91 @@
   body.theme-dark{
     --bg:#0b1020; --card:#12182a; --fg:#e5e7eb; --muted:#93a2bf; --border:#1f2740; --accent:#60a5fa; --accent-weak:#0b2a57;
   }
+
   *{ box-sizing: border-box; }
   body{ margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; background:var(--bg); color:var(--fg); }
+
   header{
     position:sticky; top:0; z-index:50; backdrop-filter: blur(6px);
     background: color-mix(in oklab, var(--card) 80%, transparent);
     border-bottom:1px solid var(--border);
   }
-  .container{ max-width:1100px; margin:0 auto; padding:12px 16px; }
-  .title-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .container{ max-width:980px; margin:0 auto; padding:12px 16px; }
+  .title-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
   h1{ font-size:18px; margin:0; }
-  .toolbar{ display:flex; gap:8px; align-items:center; }
+  .toolbar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .btn{ border:1px solid var(--border); background:var(--card); color:var(--fg); padding:8px 12px; border-radius:10px; font-size:14px; cursor:pointer; }
   .btn:hover{ border-color: var(--accent); }
   .btn.primary{ background:var(--accent); color:#fff; border-color:transparent; }
   .chip{ padding:6px 10px; border:1px solid var(--border); border-radius:999px; font-size:12px; color:var(--muted); }
-  main .grid{ display:grid; grid-template-columns: 1fr; gap:12px; padding:12px 16px; }
-  @media (min-width: 980px){
-    main .grid{ grid-template-columns: 1.1fr 0.9fr; }
-  }
+
+  /* 상하 스택 레이아웃 */
+  main .stack{ display:flex; flex-direction:column; gap:12px; padding:12px 16px; }
   .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px; }
   .card h2{ font-size:15px; margin:0 0 8px; color:var(--muted); }
+
   .row{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:8px 0; }
   label{ font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px; }
   select, input[type="range"], input[type="checkbox"]{ accent-color: var(--accent); }
   details{ border:1px dashed var(--border); border-radius:12px; padding:8px; }
   summary{ cursor:pointer; font-weight:600; color:var(--muted); }
-  #keys{ display:grid; grid-template-columns: repeat(6, 1fr); gap:8px; }
-  .key{ padding:10px 8px; border:1px solid var(--border); border-radius:10px; background:var(--card); cursor:pointer; text-align:center; }
-  .key .note{ font-weight:700; font-size:14px; }
-  .key .sub{ font-size:11px; color:var(--muted); }
-  .key.natural{ background: var(--accent-weak); border-color: color-mix(in oklab, var(--accent) 40%, var(--border)); }
-  .key.acc{ background: var(--card); }
+
+  /* 키(음정) 그리드: 반응형 줄수 고정 */
+  #keys{
+    display:grid; gap:10px;
+    grid-template-columns: repeat(3, 1fr);  /* 모바일: 3열 x 4줄 */
+  }
+  @media (min-width: 600px){
+    #keys{ grid-template-columns: repeat(4, 1fr); } /* 태블릿: 4열 x 3줄 */
+  }
+  @media (min-width: 1024px){
+    #keys{ grid-template-columns: repeat(6, 1fr); } /* 데스크톱: 6열 x 2줄(고정) */
+  }
+
+  .key{ padding: var(--key-pad); border:1px solid var(--border); border-radius:10px; background:var(--card); cursor:pointer; text-align:center; }
+  .key .note{ font-weight:700; font-size: var(--key-note); line-height:1.1; }
+  .key .sub{ font-size: var(--key-sub); color:var(--muted); line-height:1.1; margin-top:4px; }
+  /* 색상 반전: 내추럴=밝음, 샾/플랫=진함 */
+  .key.natural{ background: var(--card); border-color: var(--border); }
+  .key.acc{ background: var(--accent-weak); border-color: var(--accent); }
+
+  /* 진행률 */
   .progress{ position:relative; height:10px; background:var(--border); border-radius:999px; overflow:hidden; }
   .progress .bar{ position:absolute; inset:0 auto 0 0; width:0%; background:var(--accent); }
   .progress-text{ font-size:12px; color:var(--muted); text-align:right; margin-top:6px; }
+
+  /* 표(통계) — 경계선/줄무늬/호버 */
+  table{ width:100%; border-collapse: collapse; }
+  th, td{ border:1px solid var(--border); padding:8px 10px; font-size:12px; }
+  th{ background: var(--accent-weak); color: var(--fg); }
+  tbody tr:nth-child(even){ background: color-mix(in oklab, var(--card) 92%, var(--accent-weak)); }
+  tbody tr:hover{ background: color-mix(in oklab, var(--accent-weak) 40%, var(--card)); }
+
+  /* 토스트 */
   #toast{ position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:var(--card); border:1px solid var(--border); padding:10px 12px; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.15); opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:60; }
   #toast.show{ opacity:1; }
   #toast.ok{ border-color: color-mix(in oklab, var(--ok) 60%, var(--border)); }
   #toast.err{ border-color: color-mix(in oklab, var(--err) 60%, var(--border)); }
-  .bottombar{ position:fixed; bottom:0; left:0; right:0; z-index:40; background: color-mix(in oklab, var(--card) 92%, transparent); border-top:1px solid var(--border); display:flex; gap:8px; padding:8px 12px; }
+
+  /* 모바일 하단 액션바 */
+  .bottombar{ position:fixed; bottom:0; left:0; right:0; z-index:40; background: color-mix(in oklab, var(--card) 92%, transparent); border-top:1px solid var(--border); display:flex; gap:8px; padding:8px 16px; }
   .bottombar .btn{ flex:1; }
   @media (min-width: 980px){ .bottombar{ display:none; } }
+
+  /* 상태 텍스트 */
   #msg{ font-weight:600; }
   #primeSeq, #score, #rt, #audioState{ font-size:13px; color:var(--muted); }
+
+  /* 데스크톱에서 키 더 넉넉하게 */
+  @media (min-width: 1024px){
+    :root{ --key-min: 120px; }
+  }
 </style>
 </head>
 <body>
 <header>
   <div class="container title-row">
-    <h1>절대음감 퀴즈 v3.5.1</h1>
+    <h1>절대음감 퀴즈 v3.7</h1>
     <div class="toolbar">
       <span class="chip" id="todayChip">오늘</span>
       <button class="btn" id="btnTheme">테마: 자동</button>
@@ -91,7 +133,8 @@
 </header>
 
 <main class="container">
-  <div class="grid">
+  <div class="stack">
+    <!-- 세션 -->
     <section class="card">
       <h2>세션</h2>
       <div class="row">
@@ -123,6 +166,7 @@
           </select>
         </label>
         <span id="dayTip" class="chip">오늘 포커스: 안정화</span>
+        <span id="weekTip" class="chip">주차 포커스: 12음(스피드)</span>
       </div>
 
       <div class="row">
@@ -170,6 +214,13 @@
               <option value="5">5옥</option>
             </select>
           </label>
+          <label>키 크기
+            <select id="keySize">
+              <option value="normal" selected>보통</option>
+              <option value="large">크게</option>
+              <option value="xlarge">아주 크게</option>
+            </select>
+          </label>
         </div>
         <div class="row">
           <label><input type="checkbox" id="autoNewBoost" checked> 신규음 가중치(1~6주)</label>
@@ -185,14 +236,14 @@
       </details>
     </section>
 
+    <!-- 키(음정) -->
     <section class="card">
       <h2>키(정답/프리뷰)</h2>
       <div id="keys" class="row"></div>
-      <p class="muted">대기 상태에선 키를 누르면 해당 음이 즉시 재생됩니다. 진행 중엔 정답 입력으로 동작합니다.</p>
+      <p class="muted">대기 상태엔 키를 누르면 해당 음이 즉시 재생됩니다. 진행 중엔 정답 입력으로 동작합니다.</p>
     </section>
-  </div>
 
-  <div class="grid">
+    <!-- 진행 상황 -->
     <section class="card">
       <h2>진행 상황</h2>
       <div id="msg"></div>
@@ -208,6 +259,7 @@
       </div>
     </section>
 
+    <!-- 통계/기록 -->
     <section class="card">
       <h2>통계/기록</h2>
       <div class="row">
@@ -220,6 +272,7 @@
   </div>
 </main>
 
+<!-- 모바일 하단 액션바 -->
 <div class="bottombar">
   <button class="btn primary" id="mbPrime">프라이밍</button>
   <button class="btn primary" id="mbQuiz">문제</button>
@@ -230,9 +283,12 @@
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
-/* === 전역 오류 표시(즉시 진단용) === */
+/* === 전역 오류 표시(디버그에서만 3초 노출) === */
 (function(){
+  const debugOn = new URLSearchParams(location.search).get('debug')==='1'
+               || localStorage.getItem('aeq_debug')==='1';
   function showErr(t){
+    if (!debugOn) { console.error('[EarQuiz]', t); return; }
     var el = document.getElementById('msg');
     if(!el){
       el = document.createElement('div');
@@ -241,12 +297,13 @@
     }
     el.textContent = '오류: ' + t;
     el.style.color = '#d33';
+    setTimeout(()=>{ if(el.textContent.startsWith('오류:')) el.textContent=''; }, 3000);
   }
-  window.addEventListener('error', function(e){
+  window.addEventListener('error', e=>{
     showErr(e?.message || '알 수 없는 오류');
     console.error('[window.error]', e);
   });
-  window.addEventListener('unhandledrejection', function(e){
+  window.addEventListener('unhandledrejection', e=>{
     showErr((e?.reason && (e.reason.message || e.reason)) || 'Promise 오류');
     console.error('[unhandledrejection]', e);
   });
@@ -267,6 +324,13 @@ const weeks={
 };
 const newByWeek={1:["A","D"],2:["C","F#"],3:["E","G#"],4:["B","F"],5:["C#","G"],6:["D#","A#"]};
 const dayFocus={1:"안정화(신규음 맛보기)",2:"신규음 비중↑",3:"스피드(첫 느낌 2초)",4:"라이트 테스트",5:"혼동쌍 정리",6:"변형 시작",7:"평가(무피드백)"};
+const weekFocus={
+  1:"A/D 고정 매핑", 2:"C/F# 추가 고정", 3:"E/G# 추가 고정", 4:"B/F 추가 고정",
+  5:"C#/G 추가 고정", 6:"12음 완성(안정화)",
+  7:"12음 스피드 업(평균 RT 단축)", 8:"옥타브 일반화(3–5 권장)",
+  9:"옥타브 확장(2–6 가능)", 10:"무피드백/간섭 대비",
+  11:"혼동쌍 집중 정리", 12:"종합 평가/유지 루틴"
+};
 const SINGLE_RATIO=0.9;
 
 /* ====== 오디오 ====== */
@@ -311,6 +375,7 @@ let currentNote=null,lastNote=null;
 let in20=false,in20Paused=false,noFB=false,reviewQ=null;
 let q=0,okCnt=0,wrongCounts={},rts=[],qStart=null,timer=null;
 let primingSeq=[],primingShown=[],primingIndex=0,primingTimer=null,primingRunning=false;
+let singleMode = false; // 한 문제 모드 플래그
 
 /* ====== 유틸/진행률/토스트 ====== */
 function msg(t,good=null){ const el=byId("msg"); el.textContent=t; el.style.color= good===true? "var(--ok)" : good===false? "var(--err)" : "var(--fg)"; showToast(t,good); }
@@ -318,10 +383,11 @@ function today(){ const d=new Date(); const m=(d.getMonth()+1+"").padStart(2,"0"
 function weekVal(){ return Number(byId("week").value); }
 function dayVal(){ return Number(byId("day").value); }
 function updateDayTip(){ const d=dayVal(); setText("dayTip", `오늘 포커스: ${dayFocus[d]||"안정화"}`); }
-function parseOctRange(){ const v=byId("oct").value; if(v==="4") return [4,4]; const [a,b]=v.split("-").map(Number); return [Math.min(a,b),Math.max(a,b)]; }
+function updateWeekTip(){ const w=weekVal(); setText("weekTip", `주차 포커스: ${weekFocus[w] || "12음 일반화"}`); }
+function parseOctRange(){ const v=byId("oct").value; if(v==="4") return [4,4]; const [a,b]=v.split("-").map(Number); return [Math.min(a,b), Math.max(a,b)]; }
 function pickOct(){ const [lo,hi]=parseOctRange(); return lo+Math.floor(Math.random()*(hi-lo+1)); }
 function baseName(full){ return full.replace(/[0-9]/g,""); }
-function getOct(full){ const m=full.match(/[0-9]/); return m? Number(m[0]):4; }
+function getOct(full){ const m=full.match(/[0-9]/); return m? Number(m[0]) : 4; }
 function choice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function semitoneIndex(nb,oc){ return noteOrder.indexOf(nb)+12*oc; }
 function setProgress(done,total=20){ const pct=Math.max(0,Math.min(100,Math.round(done/total*100))); byId("progressBar").style.width=pct+"%"; setText("progressText",`${done}/${total}`); }
@@ -376,7 +442,8 @@ function getDayPrimary(){
   }else{
     const last=JSON.parse(localStorage.getItem("aeq_lastWrongCounts")||"{}");
     const pool=weeks[w];
-    const top=Object.entries(last).map(([full,c])=>({nb:baseName(full),c})).filter(x=>pool.includes(x.nb)).sort((a,b)=>b.c-a.c).map(x=>x.nb);
+    const top=Object.entries(last).map(([full,c])=>({nb:baseName(full),c}))
+      .filter(x=>pool.includes(x.nb)).sort((a,b)=> b.c-a.c).map(x=>x.nb);
     if(top.length>=2) return d===1? top[0]:top[1];
     if(top.length===1) return top[0];
     return choice(pool);
@@ -399,10 +466,10 @@ function nextQ(autoPlay=true){
 function setQuizToggleLabel(){ byId("btnQuizToggle").textContent=`문제: ${in20 && !in20Paused? "ON":"OFF"}`; byId("mbQuiz").textContent=(in20 && !in20Paused)? "문제 중지":"문제"; }
 function start20(nf=false){
   in20=true; in20Paused=false; noFB=!!nf; q=0; okCnt=0; wrongCounts={}; rts=[]; drawScore();
-  byId("btnReview").disabled=true; lastNote=null; setQuizToggleLabel(); nextQ(true);
+  byId("btnReview").disabled=true; lastNote=null; singleMode=false; setQuizToggleLabel(); nextQ(true);
 }
 function toggleQuiz(){
-  if(!in20){ in20=true; noFB=false; in20Paused=false; q=0; okCnt=0; wrongCounts={}; rts=[]; drawScore(); byId("btnReview").disabled=true; lastNote=null; nextQ(true); setQuizToggleLabel(); return; }
+  if(!in20){ in20=true; noFB=false; in20Paused=false; q=0; okCnt=0; wrongCounts={}; rts=[]; drawScore(); byId("btnReview").disabled=true; lastNote=null; singleMode=false; nextQ(true); setQuizToggleLabel(); return; }
   if(in20 && in20Paused){ in20Paused=false; setQuizToggleLabel(); if(currentNote){ playNoteBase(baseName(currentNote),getOct(currentNote),1.0); qStart=performance.now(); msg("재개합니다. 현재 문항에 답하세요."); } else nextQ(true); return; }
   if(in20 && !in20Paused){ in20Paused=true; if(timer){ clearTimeout(timer); timer=null; } msg("문제 일시정지됨. '문제: ON'으로 재개하세요."); setQuizToggleLabel(); }
 }
@@ -426,7 +493,14 @@ function answer(ansBase){
     msg(isOK? `정답! (${currentNote})`:`오답… 정답은 ${currentNote}`,isOK);
     if(reviewQ.length===0){ byId("btnReview").disabled=false; msg("복습 종료!"); reviewQ=null; }
     else{ setTimeout(()=>{ currentNote=reviewQ.shift(); playNoteBase(baseName(currentNote),getOct(currentNote),1.0); qStart=performance.now(); },600); }
-  }else msg(isOK? `정답! (${currentNote})`:`오답… 정답은 ${currentNote}`,isOK);
+  }else{
+    // 단일 문제 모드 처리
+    msg(isOK? `정답! (${currentNote})`:`오답… 정답은 ${currentNote}`,isOK);
+    if (singleMode){
+      singleMode=false; currentNote=null; byId("btnRepeat").disabled=true;
+      setTimeout(()=> msg("단일 문제 종료. '한 문제' 버튼으로 다시 시작하세요."), 700);
+    }
+  }
 }
 function drawScore(){ setText("score", in20? `진행: ${q}/20, 정답: ${okCnt}`:""); const rtEl=byId("rt"); if(rts.length>0){ const avg=(rts.reduce((a,b)=>a+b,0)/rts.length)/1000; rtEl.textContent=`평균 RT: ${avg.toFixed(2)}s`; } else rtEl.textContent=""; setProgress(q,20); }
 function endSummary(){
@@ -480,7 +554,7 @@ function labelFor(n){
   return `<span class="note">${n}</span><div class="sub">${solfegeSharp[n]||""}</div>`;
 }
 function onKeyPress(ansBase){
-  if(in20 || reviewQ){ answer(ansBase); return; }
+  if(in20 || reviewQ || singleMode){ answer(ansBase); return; }
   const oc=Number(byId("previewOct").value);
   playNoteBase(ansBase,oc,1.0);
 }
@@ -508,37 +582,87 @@ function exportCSV(){
   const a=document.createElement("a"); a.href=url; a.download=`earquiz_stats_${today()}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 function renderStats(){
-  const el=byId("statsWrap"); const data=loadHistory();
-  if(data.length===0){ el.innerHTML='<div class="muted">아직 저장된 기록이 없습니다. 세션을 한 번 완료하면 자동 저장됩니다.</div>'; return; }
-  const byDate={}; data.forEach(r=>{ (byDate[r.date]=byDate[r.date]||[]).push(r); });
-  const dates=Object.keys(byDate).sort(); const last7=dates.slice(-7);
-  function avg(arr,key){ const xs=arr.map(o=> o[key]).filter(v=> typeof v==="number"); if(xs.length===0) return null; return xs.reduce((a,b)=>a+b,0)/xs.length; }
-  const lastRows=last7.map(d=>{ const arr=byDate[d]; const acc=avg(arr,"correct"); const rt=avg(arr,"avgRT"); return {d, acc:acc!=null? `${acc.toFixed(1)}/20`:"-", rt:rt!=null? `${rt.toFixed(2)}s`:"-"}; });
-  const byWeek={}; data.forEach(r=>{ (byWeek[r.week]=byWeek[r.week]||[]).push(r); });
-  const weekRows=Object.keys(byWeek).sort((a,b)=>a-b).map(w=>{ const arr=byWeek[w]; const acc=avg(arr,"correct"); const rt=avg(arr,"avgRT"); return {w, acc:acc!=null? `${acc.toFixed(1)}/20`:"-", rt:rt!=null? `${rt.toFixed(2)}s`:"-"}; });
-  el.innerHTML=`
+  const el = document.getElementById("statsWrap");
+  const data = JSON.parse(localStorage.getItem("aeq_history")||"[]");
+  if (data.length===0){
+    el.innerHTML = '<div class="muted">아직 저장된 기록이 없습니다. 세션을 한 번 완료하면 자동 저장됩니다.</div>';
+    return;
+  }
+  const avg = (arr,k)=> {
+    const xs = arr.map(o=>o[k]).filter(v=> typeof v==="number");
+    return xs.length? (xs.reduce((a,b)=>a+b,0)/xs.length) : null;
+  };
+  const todayStr = (d=> `${d.getFullYear()}-${(d.getMonth()+1+'').padStart(2,'0')}-${(d.getDate()+'').padStart(2,'0')}`)(new Date());
+  const todayArr = data.filter(r=> r.date===todayStr);
+  const last10 = data.slice(-10).reverse();
+  const byWeek = {};
+  data.forEach(r=> (byWeek[r.week] = (byWeek[r.week]||[])).push(r));
+  const weekRows = Object.keys(byWeek).sort((a,b)=>a-b).map(w=>{
+    const arr = byWeek[w];
+    return { w, acc: avg(arr,'correct'), rt: avg(arr,'avgRT') };
+  });
+  el.innerHTML = `
     <table>
-      <thead><tr><th>최근 7일</th><th>평균 정답</th><th>평균 RT</th></tr></thead>
-      <tbody>${lastRows.map(r=> `<tr><td>${r.d}</td><td>${r.acc}</td><td>${r.rt}</td></tr>`).join("")}</tbody>
+      <thead><tr><th>오늘</th><th>세션 수</th><th>평균 정답</th><th>평균 RT</th></tr></thead>
+      <tbody><tr>
+        <td>${todayStr}</td><td>${todayArr.length}</td>
+        <td>${avg(todayArr,'correct')!=null? avg(todayArr,'correct').toFixed(1)+'/20':'-'}</td>
+        <td>${avg(todayArr,'avgRT')!=null? avg(todayArr,'avgRT').toFixed(2)+'s':'-'}</td>
+      </tr></tbody>
+    </table>
+    <table style="margin-top:10px;">
+      <thead><tr><th>최근 10회 (최신→)</th><th>주/요일</th><th>정답/20</th><th>평균 RT</th></tr></thead>
+      <tbody>
+        ${last10.map(r=> `<tr>
+          <td>${r.date}</td><td>${r.week}/${r.day}</td>
+          <td>${r.correct}/20</td><td>${r.avgRT??'-'}${r.avgRT?'s':''}</td>
+        </tr>`).join('')}
+      </tbody>
     </table>
     <table style="margin-top:10px;">
       <thead><tr><th>주차</th><th>평균 정답</th><th>평균 RT</th></tr></thead>
-      <tbody>${weekRows.map(r=> `<tr><td>${r.w}</td><td>${r.acc}</td><td>${r.rt}</td></tr>`).join("")}</tbody>
+      <tbody>
+        ${weekRows.map(r=> `<tr>
+          <td>${r.w}</td>
+          <td>${r.acc!=null? r.acc.toFixed(1)+'/20':'-'}</td>
+          <td>${r.rt!=null? r.rt.toFixed(2)+'s':'-'}</td>
+        </tr>`).join('')}
+      </tbody>
     </table>
   `;
 }
 
-/* ====== 점프 차단/테마 토글 ====== */
+/* ====== 점프 차단/테마/키 크기 ====== */
 function setJumpGuardState(on){ const cb=byId("jumpGuard"); const btn=byId("btnJumpGuardToggle"); cb.checked=!!on; btn.textContent=`상대음감 차단: ${on? "ON":"OFF"}`; localStorage.setItem("aeq_jumpGuard", on? "1":"0"); msg(`상대음감 차단이 ${on? "켜졌습니다":"꺼졌습니다"}. (다음 문제부터 적용)`); }
 function initJumpGuardState(){ const saved=localStorage.getItem("aeq_jumpGuard"); const on=(saved===null)? true: saved==="1"; setJumpGuardState(on); }
 function syncThemeBtn(){ const saved=localStorage.getItem("aeq_theme"); byId("btnTheme").textContent= saved==="dark"? "테마: 다크" : saved==="light"? "테마: 라이트":"테마: 자동"; }
 function applyTheme(mode){ document.body.classList.toggle("theme-dark", mode==="dark"); if(mode) localStorage.setItem("aeq_theme",mode); else localStorage.removeItem("aeq_theme"); syncThemeBtn(); }
 function initTheme(){ const saved=localStorage.getItem("aeq_theme"); if(saved==="dark") document.body.classList.add("theme-dark"); if(saved==="light") document.body.classList.remove("theme-dark"); syncThemeBtn(); }
+function applyKeySize(mode){
+  const root = document.documentElement;
+  const map = {
+    normal: { pad: '12px', note: '16px', sub: '12px', min: '110px' },
+    large:  { pad: '16px', note: '18px', sub: '13px', min: '130px' },
+    xlarge: { pad: '18px', note: '20px', sub: '14px', min: '150px' }
+  };
+  const v = map[mode] || map.normal;
+  root.style.setProperty('--key-pad', v.pad);
+  root.style.setProperty('--key-note', v.note);
+  root.style.setProperty('--key-sub', v.sub);
+  root.style.setProperty('--key-min', v.min);
+  localStorage.setItem('aeq_keySize', mode);
+}
+function initKeySize(){
+  const sel = document.getElementById('keySize');
+  const saved = localStorage.getItem('aeq_keySize') || 'normal';
+  if (sel) sel.value = saved;
+  applyKeySize(saved);
+}
 
 /* ====== 초기화 ====== */
 window.addEventListener("load", ()=>{
   byId("week").value="1"; byId("day").value="1"; byId("oct").value="4";
-  updateDayTip(); buildKeys(); updateAudioState(); initJumpGuardState(); initTheme();
+  updateDayTip(); updateWeekTip(); buildKeys(); updateAudioState(); initJumpGuardState(); initTheme(); initKeySize();
   setText("todayChip", today()); setProgress(0,20);
 
   byId("btnUnlock").addEventListener("click", ()=>{ ensureAudio(); unlocked=true; msg("오디오 활성화 완료!"); });
@@ -547,7 +671,7 @@ window.addEventListener("load", ()=>{
   byId("btnTest").addEventListener("click", ()=>{ ensureAudio(); const oc=4; const seq=["A","C#","E","A"]; let i=0; msg("사운드 테스트 중…"); (function step(){ if(i>=seq.length){ msg("테스트 완료. 시작해 보세요!"); return; } playNoteBase(seq[i],oc,0.38); i++; setTimeout(step,520); })(); });
 
   byId("vol").addEventListener("input", ()=>{ ensureAudio(); setMasterVolume(); });
-  byId("week").addEventListener("change", ()=> msg("주차 변경됨."));
+  byId("week").addEventListener("change", ()=>{ msg("주차 변경됨."); updateWeekTip(); });
   byId("day").addEventListener("change", updateDayTip);
   byId("oct").addEventListener("change", ()=> msg("옥타브 범위 변경됨."));
   byId("octNormalize").addEventListener("change", ()=> msg("옥타브 음량 보정 변경."));
@@ -557,7 +681,12 @@ window.addEventListener("load", ()=>{
   byId("errorBoost").addEventListener("change", ()=> msg("오답 가중치 변경."));
 
   byId("btnPrimeToggle").addEventListener("click", togglePriming);
-  byId("btnOne").addEventListener("click", ()=>{ in20=false; in20Paused=false; noFB=false; q=0; okCnt=0; wrongCounts={}; rts=[]; drawScore(); byId("btnReview").disabled=true; byId("primeSeq").textContent=""; setQuizToggleLabel(); nextQ(true); });
+  byId("btnOne").addEventListener("click", ()=>{
+    in20=false; in20Paused=false; noFB=false; q=0; okCnt=0; wrongCounts={}; rts=[]; drawScore();
+    byId("btnReview").disabled=true; byId("primeSeq").textContent="";
+    singleMode = true;
+    nextQ(true);
+  });
   byId("btnQuizToggle").addEventListener("click", toggleQuiz);
   byId("btnStart20NF").addEventListener("click", ()=>{ byId("primeSeq").textContent=""; start20(true); });
 
@@ -571,11 +700,13 @@ window.addEventListener("load", ()=>{
   byId("btnJumpGuardToggle").addEventListener("click", ()=>{ const now=byId("jumpGuard").checked; setJumpGuardState(!now); });
   window.addEventListener("keydown", (ev)=>{ if(ev.key.toLowerCase()==="j"){ const now=byId("jumpGuard").checked; setJumpGuardState(!now); } });
 
+  // 모바일 하단바
   byId("mbPrime").addEventListener("click", togglePriming);
   byId("mbQuiz").addEventListener("click", toggleQuiz);
   byId("mbRepeat").addEventListener("click", ()=>{ if(currentNote){ playNoteBase(baseName(currentNote), getOct(currentNote), 1.0); qStart=performance.now(); } });
   byId("mbReview").addEventListener("click", startReview);
 
+  // 테마 토글: 자동 → 라이트 → 다크 → 자동
   byId("btnTheme").addEventListener("click", ()=>{ const saved=localStorage.getItem("aeq_theme"); if(!saved) applyTheme("light"); else if(saved==="light") applyTheme("dark"); else applyTheme(null); });
 });
 </script>
